@@ -40,23 +40,22 @@ const { developmentChains, TOKEN_NAME, TOKEN_SYMBOL } = require("../../helper-ha
 			})
 
 			describe("mintNft", async () => {
-				// beforeEach(async () => {
-				//     const txMint = await basicNftContract.mintNft()
-				// })
-				it("will mint the first nft with a tokenid of 1 and increment after mint by 1", async () => {
+				it("the first nft will a tokenid of 1 and the counter will increment after mint by 1", async () => {
+					const txMint = await basicNftContract.mintNft()
+					const txMintResult = await txMint.wait(1)
+					const tokenId = await txMintResult.events[0].args.tokenId
+
+					const expectedTokenId = await basicNftContract.getTokenCounter()
+
+					assert.equal(expectedTokenId.toString(), tokenId.toString())
+				})
+				it("shows correct balance and owner of the NFT", async () => {
 					const txMint = await basicNftContract.mintNft()
 					const txMintResult = await txMint.wait(1)
 					const tokenId = txMintResult.events[0].args.tokenId
-					const expectedTokenId = (await basicNftContract.getTokenCounter()) - 1
-
-					assert.equal(expectedTokenId, tokenId)
-				})
-				it.only("shows correct balance and owner of the NFT", async () => {
-					const txMint = await basicNftContract.mintNft()
-					await txMint.wait(1)
 
 					const deployerBalance = await basicNftContract.balanceOf(deployer)
-					const owner = await basicNftContract.ownerOf("0")
+					const owner = await basicNftContract.ownerOf(tokenId)
 
 					assert.equal(deployerBalance, 1)
 					assert.equal(owner, deployer)
