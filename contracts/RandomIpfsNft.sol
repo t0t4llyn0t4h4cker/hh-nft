@@ -10,7 +10,11 @@ error RandomIpfsNft__NotEnoughETHSent();
 error RandomIpfsNft__RangeOutOfBounds();
 error RandomIpfsNft__TransferFailed();
 
-contract RandomIpfsNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
+contract RandomIpfsNft is
+    VRFConsumerBaseV2,
+    ERC721URIStorage,
+    Ownable
+{
     /* Type Declarations */
     enum Breed {
         PUG,
@@ -35,7 +39,10 @@ contract RandomIpfsNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
     mapping(uint256 => address) public s_requestIdToAddress;
 
     /* Events */
-    event NftMintRequested(uint256 indexed requestId, address minter);
+    event NftMintRequested(
+        uint256 indexed requestId,
+        address minter
+    );
     event NftMinted(Breed dogBreed, address minter);
 
     /* Functions*/
@@ -48,8 +55,13 @@ contract RandomIpfsNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
         uint32 callbackGasLimit,
         uint256 mintFee,
         string[3] memory dogTokenUris
-    ) VRFConsumerBaseV2(vrfCoordinatorV2) ERC721(_name, _symbol) {
-        i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
+    )
+        VRFConsumerBaseV2(vrfCoordinatorV2)
+        ERC721(_name, _symbol)
+    {
+        i_vrfCoordinator = VRFCoordinatorV2Interface(
+            vrfCoordinatorV2
+        );
         i_keyHash = keyHash;
         i_subscriptionId = subscriptionId;
         i_callbackGasLimit = callbackGasLimit;
@@ -57,7 +69,11 @@ contract RandomIpfsNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
         s_dogTokenUris = dogTokenUris;
     }
 
-    function requestNft() public payable returns (uint256 requestId) {
+    function requestNft()
+        public
+        payable
+        returns (uint256 requestId)
+    {
         if (msg.value < i_mintFee) {
             revert RandomIpfsNft__NotEnoughETHSent();
         }
@@ -73,15 +89,15 @@ contract RandomIpfsNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
         emit NftMintRequested(requestId, msg.sender);
     }
 
-    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords)
-        internal
-        override
-    {
+    function fulfillRandomWords(
+        uint256 requestId,
+        uint256[] memory randomWords
+    ) internal override {
         address minter = s_requestIdToAddress[requestId];
         uint256 nftId = s_tokenId;
         s_tokenId++;
         uint256 moddedRng = randomWords[0] % MAX_CHANCE_VALUE;
-        // will return num between 1 - 99
+        // will return num between 1 - 99 because max chance is 100
         Breed dogBreed = getBreedFromModdedRng(moddedRng);
         _safeMint(minter, nftId);
         _setTokenURI(nftId, s_dogTokenUris[uint256(dogBreed)]);
@@ -90,7 +106,9 @@ contract RandomIpfsNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
 
     function withdraw() public onlyOwner {
         uint256 amount = address(this).balance;
-        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        (bool success, ) = payable(msg.sender).call{
+            value: amount
+        }("");
         if (!success) {
             revert RandomIpfsNft__TransferFailed();
         }
@@ -122,7 +140,11 @@ contract RandomIpfsNft is VRFConsumerBaseV2, ERC721URIStorage, Ownable {
         revert RandomIpfsNft__RangeOutOfBounds();
     }
 
-    function getChanceArray() public pure returns (uint256[3] memory) {
+    function getChanceArray()
+        public
+        pure
+        returns (uint256[3] memory)
+    {
         return [10, 30, MAX_CHANCE_VALUE]; // index 1 has 20% and index 2 has 60%
     }
 
