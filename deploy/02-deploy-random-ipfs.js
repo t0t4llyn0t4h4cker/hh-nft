@@ -6,17 +6,36 @@ const {
 	TOKEN_SYMBOL,
 } = require("../helper-hardhat-config")
 const { verify } = require("../utils/verify.js")
-const { storeImages } = require("../utils/uploadToPinata.js")
+const {
+	storeImages,
+	storeTokenUriMetadata,
+} = require("../utils/uploadToPinata.js")
 require("dotenv").config()
 
-const VRF_SUB_FUND_AMOUNT = ethers.utils.parseEther("1")
+const VRF_SUB_FUND_AMOUNT = ethers.utils.parseEther("10")
 const imagesLocation = "./images/randomNft"
+const metadataTemplate = {
+	name: "",
+	description: "",
+	image: "",
+	attributes: [
+		{
+			trait_type: "Cuteness",
+			value: 100,
+		},
+	],
+}
+
+let tokenUris = [
+	"ipfs://QmaVkBn2tKmjbhphU7eyztbvSQU5EXDdqRyXZtRhSGgJGo",
+	"ipfs://QmYQC5aGZu2PTH8XzbJrbDnvhj3gVs7ya33H9mqUNvST3d",
+	"ipfs://QmZYmH5iDbD6v3U2ixoVAjioSzvWJszDzYdbeCLquGSpVm",
+]
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
 	const { deploy, log } = deployments
 	const { deployer } = await getNamedAccounts()
 	const chainId = network.config.chainId
-	let tokenUris
 
 	/// get the IPFS hashes of our images
 	if (process.env.UPLOAD_TO_PINATA == "true") {
@@ -49,56 +68,77 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
 		subscriptionId = networkConfig[chainId]["subscriptionId"]
 	}
 	log("-----------------------------")
-	await storeImages(imagesLocation)
 	//
 	//
 
-	// const keyHash = networkConfig[chainId]["keyHash"]
-	// const callbackGasLimit = networkConfig[chainId]["callbackGasLimit"]
+	const keyHash = networkConfig[chainId]["keyHash"]
+	const callbackGasLimit = networkConfig[chainId]["callbackGasLimit"]
 
-	// const mintFee = networkConfig[chainId]["mintFee"]
-	// // const dogTokenUris = networkConfig[chainId]["dogTokenUris"]
+	const mintFee = networkConfig[chainId]["mintFee"]
+	// const dogTokenUris = networkConfig[chainId]["dogTokenUris"]
 
-	// const args = [
-	// 	vrfCoordinatorV2Address,
-	// 	TOKEN_NAME,
-	// 	TOKEN_SYMBOL,
-	// 	keyHash,
-	// 	subscriptionId,
-	// 	callbackGasLimit,
-	// 	mintFee,
-	// 	dogTokenUris,
-	// ]
-	// // deploy our contract
-	// const randomIpfsContract = await deploy("RandomIpfsNft", {
-	// 	from: deployer,
-	// 	args: args,
-	// 	log: true,
-	// 	waitConfirmations: network.config.blockConfirmations || 1,
-	// })
-	// if (developmentChains.includes(network.name)) {
-	// 	log("Local network detected, Consumer added to vrfCoordinatorV2Mock")
-	// 	await vrfCoordinatorV2Mock.addConsumer(
-	// 		subscriptionId,
-	// 		lottery.address
-	// 	)
-	// }
-	// log(`NFT Contract deployed at ${randomIpfsContract.address}`)
+	const args = [
+		vrfCoordinatorV2Address,
+		TOKEN_NAME,
+		TOKEN_SYMBOL,
+		keyHash,
+		subscriptionId,
+		callbackGasLimit,
+		mintFee,
+		tokenUris,
+	]
+	// deploy our contract
+	const randomIpfsContract = await deploy("RandomIpfsNft", {
+		from: deployer,
+		args: args,
+		log: true,
+		waitConfirmations: network.config.blockConfirmations || 1,
+	})
+	if (developmentChains.includes(network.name)) {
+		log("Local network detected, Consumer added to vrfCoordinatorV2Mock")
+		await vrfCoordinatorV2Mock.addConsumer(
+			subscriptionId,
+			randomIpfsContract.address
+		)
+	}
+	log(`RandomIpfsNft Contract deployed at ${randomIpfsContract.address}`)
 
-	// if (
-	// 	!developmentChains.includes(network.name) &&
-	// 	process.env.ETHERSCAN_API_KEY
-	// ) {
-	// 	await verify(randomIpfsContract.address, args)
-	// }
-	// log("----------------------------------")
+	if (
+		!developmentChains.includes(network.name) &&
+		process.env.ETHERSCAN_API_KEY
+	) {
+		log("Verifying...")
+		await verify(randomIpfsContract.address, args)
+	}
+	log("----------------------------------")
 }
 
 async function handleTokenUris() {
 	tokenUris = []
 	// store image in IPFS
 	// store metadta in IPFS
-
+	const { responses: imageUploadResponses, files } = await storeImages(
+		imagesLocation
+	)
+	for (let imageUploadResponseIndex in imageUploadResponses) {
+		// create metadata
+		// upload metadata
+		let tokenUriMetadata = { ...metadataTemplate } // js sugar to unpack
+		tokenUriMetadata.name = files[imageUploadResponseIndex].replace(
+			".png",
+			""
+		) // strips the file ending from the locally read files
+		tokenUriMetadata.description = `An adorable ${tokenUriMetadata.name} pup!`
+		tokenUriMetadata.image = `ipfs://${imageUploadResponses[imageUploadResponseIndex].IpfsHash}` // IpfsHash specifying the part of the response we want to store
+		console.log(`Uploading ${tokenUriMetadata.name}'s Metadata`)
+		// store the JSON to pinata / IPFS
+		const metadataUploadResponse = await storeTokenUriMetadata(
+			tokenUriMetadata
+		)
+		tokenUris.push(`ipfs://${metadataUploadResponse.IpfsHash}`)
+	}
+	console.log("Token URIs Uploaded! They are:")
+	console.log(tokenUris)
 	return tokenUris
 }
 
